@@ -1,0 +1,20 @@
+splink:
+  local_dataset:
+    data: hapmap1_100_1.bed
+    phenotype: hapmap1_100_1.pheno
+    covariate: hapmap1_100_1.cov
+  phenotype_name: pheno
+  covariate_names: null
+  logic:
+    mode: file
+    dir: .
+  axis: 0
+  use_smpc: false
+  algorithm: chi-square # logistic-regression # linear-regression # chi-square
+  covariates: null
+  chunk_size: 1
+  max_iterations: 20
+  cpu_cores: 1
+  result:
+    manhattan: manhattan-plot
+    output: chi-square-result.csv

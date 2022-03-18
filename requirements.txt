@@ -1,0 +1,11 @@
+bottle
+jsonpickle
+joblib
+numpy
+bios
+pydot
+pyyaml
+pandas
+scipy
+matplotlib
+featurecloud==0.0.14
