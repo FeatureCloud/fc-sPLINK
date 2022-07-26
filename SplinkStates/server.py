@@ -178,83 +178,20 @@ class SplinkServer(Splink):
 
     #
     # # ###### Linear/logistic regression result computation/saving functions
-    # def compute_t_stat_values(self):
-    #     """ Compute T statistics for the chunk """
-    #
-    #     try:
-    #         for snp_index in self.considered_snp_indices:
-    #             self.t_stat_values[snp_index] = self.beta_values[snp_index] / self.std_error_values[snp_index]
-    #
-    #         logger.info(f'Project {self.project_id}: T statistics computation done for chunk # {self.current_chunk}!')
-    #
-    #     except Exception as t_stats_exception:
-    #         logger.error(f'Project {self.project_id}: {t_stats_exception}')
-    #         self.project_failed()
-    #
-    # def compute_results_regression(self):
-    #     """ Compute t-stat and p-values for the linear/logistic regression algorithm """
-    #
-    #     try:
-    #         self.compute_t_stat_values()
-    #         self.compute_p_values()
-    #     except Exception as result_computation_error:
-    #         logger.error(f"Regression result computation error: {result_computation_error}")
-    #         self.project_failed()
-    #
-    # def save_results_regression(self):
-    #     """ Save the linear/logistic regression results for the chunk into the file """
-    #
-    #     try:
-    #         # create result directory/file if they do not already exist
-    #         result_dir = self.create_result_dir()
-    #
-    #         if self.algorithm == SplinkAlgorithm.LINEAR_REGRESSION:
-    #             result_file = open(f'{result_dir}/linear-regression-result.csv', 'a')
-    #         else:
-    #             result_file = open(f'{result_dir}/logistic-regression-result.csv', 'a')
-    #
-    #         # write the result file header in the first chunk
-    #         if self.current_chunk == 1:
-    #             result_file.write('CHR,SNP,BP,A1,TEST,NMISS,BETA,STAT,P')
-    #
-    #         for snp_index in np.arange(self.chunk_start_index, self.chunk_end_index):
-    #             snp_id = self.snp_id_values[snp_index].decode('utf-8')
-    #             chromosome_number, snp_name, base_pair_distance = snp_id.split('\t')
-    #
-    #             beta_counter = 1
-    #             minor_allele = self.minor_allele_names[snp_index]
-    #             feature_name = 'ADD'
-    #             non_missing_samples = round_result(self.non_missing_sample_counts[snp_index])
-    #
-    #             beta_value = round_result(self.beta_values[snp_index][beta_counter])
-    #             t_stat_value = round_result(self.t_stat_values[snp_index][beta_counter])
-    #             p_value = round_result(self.p_values[snp_index][beta_counter])
-    #
-    #             csv_row = f'{chromosome_number},{snp_name},{base_pair_distance},' \
-    #                       f'{minor_allele},{feature_name},{non_missing_samples},' \
-    #                       f'{beta_value},{t_stat_value},{p_value}'
-    #
-    #             result_file.write("\n" + str(csv_row))
-    #
-    #             for covariate in self.covariates:
-    #                 beta_counter += 1
-    #                 beta_value = round_result(self.beta_values[snp_index][beta_counter])
-    #                 t_stat_value = round_result(self.t_stat_values[snp_index][beta_counter])
-    #                 p_value = round_result(self.p_values[snp_index][beta_counter])
-    #
-    #                 csv_row = f'{chromosome_number},{snp_name},{base_pair_distance},' \
-    #                           f'{minor_allele},{covariate},{non_missing_samples},' \
-    #                           f'{beta_value},{t_stat_value},{p_value}'
-    #
-    #                 result_file.write("\n" + str(csv_row))
-    #
-    #         result_file.close()
-    #
-    #         logger.info(f'Project {self.project_id}: Saving results done for chunk # {self.current_chunk}!')
-    #     except Exception as save_regression_results_exception:
-    #         logger.error(f'Project {self.project_id}: {save_regression_results_exception}')
-    #         self.project_failed()
-    #
+    def compute_t_stat_values(self):
+        """ Compute T statistics for the chunk """
+
+        for snp_index in self.considered_snp_indices:
+            self.t_stat_values[snp_index] = self.beta_values[snp_index] / self.std_error_values[snp_index]
+
+        print(f'T statistics computation done for chunk # {self.current_chunk}!')
+
+    def compute_results_regression(self, algorithm, covariates):
+        """ Compute t-stat and p-values for the linear/logistic regression algorithm """
+        self.compute_t_stat_values()
+        self.compute_p_values(algorithm, covariates)
+
+
     # # ############## Chunking functions
     # def init_chunks(self):
     #     """ Set the total number of chunks and start/end indices of the chunks """
@@ -271,6 +208,40 @@ class SplinkServer(Splink):
     #         logger.error(f'Project {self.project_id}: {init_chunk_exp}')
     #         self.project_failed()
     #
+    def init_algorithm_attributes(self):
+        """ Set the chi-square or linear/logistic regression algorithm related dictionaries to empty """
+
+        self.non_missing_sample_counts = dict()
+        self.allele_counts = dict()
+        self.minor_allele_names = dict()
+        self.major_allele_names = dict()
+        self.minor_allele_counts = dict()
+        self.major_allele_counts = dict()
+        self.minor_allele_frequencies = dict()
+        self.major_allele_frequencies = dict()
+
+        self.contingency_tables = dict()
+        self.maf_case = dict()
+        self.maf_control = dict()
+        self.chi_square_values = dict()
+        self.odd_ratio_values = dict()
+
+        self.xt_x_matrices = dict()
+        self.xt_y_vectors = dict()
+        self.xt_x_inverse_matrices = dict()
+        self.sse_values = dict()
+
+        self.gradient_vectors = dict()
+        self.hessian_matrices = dict()
+        self.new_log_likelihood_values = dict()
+        self.new_beta_values = dict()
+        self.log_likelihood_values = dict()
+
+        self.beta_values = dict()
+        self.std_error_values = dict()
+        self.t_stat_values = dict()
+        self.p_values = dict()
+
     def setup_next_chunk(self):
         """ For the next chunk of SNPs:
                 set the start/end chunk index, increment chunk number,
@@ -331,6 +302,7 @@ class SplinkServer(Splink):
     def append_to_results_all_chunks(self):
         """ Add the chromosome numbers, base pair distances, and p-values of the current chunk to
             the corresponding lists for all chunks """
+
         for snp_index in np.arange(self.chunk_start_index, self.chunk_end_index):
             snp_id = self.snp_id_values[snp_index].decode('utf-8')
             chromosome_number, _, base_pair_distance = snp_id.split('\t')
@@ -346,28 +318,25 @@ class SplinkServer(Splink):
         manhattan_dict = {'CHR': self.chromosome_number_all_chunks,
                           'BP': self.base_pair_distance_all_chunks,
                           'P': self.p_value_all_chunks}
-
+        log(manhattan_dict['CHR'])
+        log(manhattan_dict['BP'])
+        log(manhattan_dict['P'])
         manhattan_df = pd.DataFrame.from_dict(manhattan_dict)
-
-        manhattan_df.loc[manhattan_df.P == 0.0, 'P'] = np.finfo(float).eps
-
-        manhattan_df['P_LOG10'] = -np.log10(manhattan_df.P)
+        manhattan_df['P_LOG10'] = [-np.log10(row) for row in manhattan_df.P.values]
 
         manhattan_df.CHR = manhattan_df.CHR.astype('category')
         manhattan_df.CHR = manhattan_df.CHR.cat.set_categories(list(set(manhattan_df.CHR)), ordered=True)
         manhattan_df = manhattan_df.sort_values(['CHR', 'BP'])
-
         manhattan_df['ind'] = range(len(manhattan_df))
         manhattan_df_grouped = manhattan_df.groupby('CHR')
-
         fig = plt.figure(figsize=(24, 8), dpi=80)
         ax = fig.add_subplot(111)
         colors = ['blue', 'green', 'purple', 'brown']
         x_labels = []
         x_labels_pos = []
         for num, (name, group) in enumerate(manhattan_df_grouped):
-            print(name)
             group.plot(kind='scatter', x='ind', y='P_LOG10', color=colors[num % len(colors)], ax=ax)
+
             x_labels.append(name)
             x_labels_pos.append((group['ind'].iloc[-1] - (group['ind'].iloc[-1] - group['ind'].iloc[0]) / 2))
 
@@ -381,6 +350,62 @@ class SplinkServer(Splink):
         plt.savefig(manhatan_filename, format='png')
 
         log(f'Manhattan plot created!')
+
+    # used in std-error step of linear/logistic regression
+    def read_queue_std_error(self, queue_std_error):
+        while len(self.std_error_values) < len(self.considered_snp_indices):
+            std_error = queue_std_error.get()
+            self.std_error_values.update(std_error)
+
+    def save_results_regression(self, res_filename, covariates):
+        """ Save the linear/logistic regression results for the chunk into the file """
+
+        # create result directory/file if they do not already exist
+        # result_dir = self.create_result_dir()
+
+        # if algorithm == ALGORITHM.LINEAR_REGRESSION:
+        #     result_file = open(f'{result_dir}/linear-regression-result.csv', 'a')
+        # else:
+        #     result_file = open(f'{result_dir}/logistic-regression-result.csv', 'a')
+
+        result_file = open(res_filename, 'a')
+
+        # write the result file header in the first chunk
+        if self.current_chunk == 1:
+            result_file.write('CHR,SNP,BP,A1,TEST,NMISS,BETA,STAT,P')
+        for snp_index in np.arange(self.chunk_start_index, self.chunk_end_index):
+            snp_id = self.snp_id_values[snp_index].decode('utf-8')
+            chromosome_number, snp_name, base_pair_distance = snp_id.split('\t')
+
+            beta_counter = 1
+            minor_allele = self.minor_allele_names[snp_index]
+            feature_name = 'ADD'
+            non_missing_samples = round_result(self.non_missing_sample_counts[snp_index])
+
+            beta_value = round_result(self.beta_values[snp_index][beta_counter])
+            t_stat_value = round_result(self.t_stat_values[snp_index][beta_counter])
+            p_value = round_result(self.p_values[snp_index][beta_counter])
+
+            csv_row = f'{chromosome_number},{snp_name},{base_pair_distance},' \
+                      f'{minor_allele},{feature_name},{non_missing_samples},' \
+                      f'{beta_value},{t_stat_value},{p_value}'
+
+            result_file.write("\n" + str(csv_row))
+
+            for covariate in covariates:
+            # for beta_counter, covariate in enumerate(covariates):
+                beta_counter += 1
+                beta_value = round_result(self.beta_values[snp_index][beta_counter])
+                t_stat_value = round_result(self.t_stat_values[snp_index][beta_counter])
+                p_value = round_result(self.p_values[snp_index][beta_counter])
+
+                csv_row = f'{chromosome_number},{snp_name},{base_pair_distance},' \
+                          f'{minor_allele},{covariate},{non_missing_samples},' \
+                          f'{beta_value},{t_stat_value},{p_value}'
+
+                result_file.write("\n" + str(csv_row))
+
+        result_file.close()
 
 
 DIGITS_OF_PRECISION = 4

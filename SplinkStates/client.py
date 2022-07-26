@@ -30,3 +30,63 @@ class SplinkClient(Splink):
             y_vector = y_vector.astype(np.uint8)
 
         return x_matrix, y_vector
+
+    def minor_allele(self, global_minor_allele_names, global_major_allele_names):
+
+        for snp_index in global_minor_allele_names.keys():
+            # if local minor/major allele is different from the global minor/major allele
+            if self.second_allele_names[snp_index] != global_major_allele_names[snp_index]:
+                # swap the local minor and major allele names
+                self.first_allele_names[snp_index] = global_minor_allele_names[snp_index]
+                self.second_allele_names[snp_index] = global_major_allele_names[snp_index]
+
+                # inverse the mapping of the SNP values 0 -> 2 and 2 -> 0
+                self.snp_values[snp_index] = np.where(self.snp_values[snp_index] == 2, -3, self.snp_values[snp_index])
+                self.snp_values[snp_index] = np.where(self.snp_values[snp_index] == 0, 2, self.snp_values[snp_index])
+                self.snp_values[snp_index] = np.where(self.snp_values[snp_index] == -3, 0, self.snp_values[snp_index])
+
+    # ##### Queue functions
+    def read_queue_non_missing(self, queue_non_missing):
+        while len(self.non_missing_sample_counts) < self.current_chunk_size:
+            sample_count_non_missing = queue_non_missing.get()
+            self.non_missing_sample_counts.update(sample_count_non_missing)
+
+    def read_queue_allele_counts(self, queue_allele_counts):
+        while len(self.allele_counts) < self.current_chunk_size:
+            count_alleles = queue_allele_counts.get()
+            self.allele_counts.update(count_alleles)
+
+    def read_queue_contingency_tables(self, queue_contingency_tables):
+        while len(self.contingency_tables) < self.current_chunk_size:
+            cont_table = queue_contingency_tables.get()
+            self.contingency_tables.update(cont_table)
+
+    def read_queue_xt_x_matrix(self, queue_xt_x_matrix):
+        while len(self.xt_x_matrix) < self.current_chunk_size:
+            xt_x = queue_xt_x_matrix.get()
+            self.xt_x_matrix.update(xt_x)
+
+    def read_queue_xt_y_vector(self, queue_xt_y_vector):
+        while len(self.xt_y_vector) < self.current_chunk_size:
+            xt_y = queue_xt_y_vector.get()
+            self.xt_y_vector.update(xt_y)
+
+    def read_queue_sse(self, queue_sse):
+        while len(self.sse_values) < self.current_chunk_size:
+            sse = queue_sse.get()
+            self.sse_values.update(sse)
+
+    def read_queue_gradient(self, queue_gradient):
+        while len(self.gradient_vectors) < self.current_chunk_size:
+            gradient = queue_gradient.get()
+            self.gradient_vectors.update(gradient)
+
+    def read_queue_hessian(self, queue_hessian):
+        while len(self.hessian_matrices) < self.current_chunk_size:
+            hessian_matrix = queue_hessian.get()
+            self.hessian_matrices.update(hessian_matrix)
+
+    def read_queue_log_likelihood(self, queue_log_likelihood):
+        while len(self.log_likelihood_values) < self.current_chunk_size:
+            log_likelihood = queue_log_likelihood.get()
+            self.log_likelihood_values.update(log_likelihood)

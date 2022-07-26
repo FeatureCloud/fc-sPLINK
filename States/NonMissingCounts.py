@@ -33,15 +33,26 @@ class NonMissingCounts(AppState, SplinkClient):
     def register(self):
         self.register_transition('Aggregate_Non_Missing_Counts', Role.COORDINATOR)
         self.register_transition('Contingency_Table', Role.PARTICIPANT)
+        self.register_transition('Beta_Linear', Role.PARTICIPANT)
+        self.register_transition('Beta_Logistic', Role.PARTICIPANT)
 
     def run(self) -> str or None:
+        """
+        Sharing:
+        non_missing_sample_counts
+        allele_counts
+
+        Returns
+        -------
+
+        """
         load_attrs(self)
         self.current_chunk, self.total_chunks, self.snp_indices, self.chunk_start_index, self.chunk_end_index = \
             self.await_data()
         self.current_chunk_size = len(self.snp_indices)
         non_missing_sample_counts, allele_counts = self.non_missing_counts()
         self.send_data_to_coordinator(data=non_missing_sample_counts, use_smpc=self.load('smpc_used'))
-        if self.coordinator:
+        if self.is_coordinator:
             # self.non_missing_sample_counts = \
             #     self.aggregate_data(operation=SMPCOperation.ADD, use_smpc=self.load('smpc_used'))
             self.store('non_missing_sample_counts',
@@ -51,14 +62,23 @@ class NonMissingCounts(AppState, SplinkClient):
             sleep(5)
         self.send_data_to_coordinator(data=allele_counts, use_smpc=self.load('smpc_used'))
 
+
+        # if self.load('config')['algorithm'] in [ALGORITHM.CHI_SQUARE, ALGORITHM.LINEAR_REGRESSION]:
+        #     self.send_data_to_coordinator(data=allele_counts, use_smpc=self.load('smpc_used'))
+        # else:
+        #     beta_values = self.get_beta_values()
+        #     # share initial beta values (excluding ignored SNPs) for which gradient, Hessian, and log likelihood
+        #     # should be computed in clients
+        #     # self.send_data_to_coordinator(data=[beta_values, self.current_beta_iteration])
+        #     self.send_data_to_coordinator(data=beta_values)
         share_attrs(self)
-        if self.coordinator:
+        if self.is_coordinator:
             return 'Aggregate_Non_Missing_Counts'
         if self.load('config')['algorithm'] == ALGORITHM.CHI_SQUARE:
             return 'Contingency_Table'
         if self.load('config')['algorithm'] == ALGORITHM.LINEAR_REGRESSION:
-            return ''
-        return ''
+            return 'Beta_Linear'
+        return 'Beta_Logistic'
 
     def non_missing_counts(self):
         self.set_sub_chunk_indices(self.chunk_start_index, self.chunk_end_index)
@@ -190,6 +210,18 @@ class NonMissingCounts(AppState, SplinkClient):
             count_alleles = queue_allele_counts.get()
             self.allele_counts.update(count_alleles)
 
+    # def get_beta_values(self):
+    #     # initialize log_likelihood and beta values
+    #     self.considered_in_process_snp_indices = self.considered_snp_indices.intersection(
+    #         self.in_process_snp_indices)
+    #     beta_values = dict()  # beta values shared with clients
+    #     for snp_index in self.considered_in_process_snp_indices:
+    #         # 2 for snp and intercept columns
+    #         beta_values[snp_index] = np.array([0.0 for _ in range(0, len(self.load('config')['covariates']) + 2)])
+    #         # beta_values[snp_index] = np.array([0.0 for _ in range(0, len(self.covariates) + 2)])
+    #         self.beta_values[snp_index] = beta_values[snp_index]
+    #         self.log_likelihood_values[snp_index] = None
+
 
 @app_state('Aggregate_Non_Missing_Counts', Role.COORDINATOR)
 class AggregateNonMissingCounts(AppState, SplinkServer):
@@ -198,24 +230,42 @@ class AggregateNonMissingCounts(AppState, SplinkServer):
 
     def register(self):
         self.register_transition('Contingency_Table', Role.COORDINATOR)
+        self.register_transition('Beta_Linear', Role.COORDINATOR)
+        self.register_transition('Beta_Logistic', Role.COORDINATOR)
+
 
     def run(self) -> str or None:
+        """
+        Share:
+        minor_allele_names_considered
+        major_allele_names_considered
+        Returns
+        -------
+
+        """
         load_attrs(self)
         allele_counts = self.aggregate_data(operation=SMPCOperation.ADD, use_smpc=self.load('smpc_used'))
+        # allele_counts = self.gather_data()
         non_missing_sample_counts = self.load('non_missing_sample_counts')
         # non_missing_sample_counts = self.non_missing_sample_counts
-        # self.load_attrs()
-        minor_allele_names_considered, major_allele_names_considered = \
-            self.aggregate_non_missing_counts(non_missing_sample_counts, allele_counts)
-        data = self.aggregate_minor_allele()
-        self.broadcast_data(data=[minor_allele_names_considered, major_allele_names_considered, data])
+        data_to_send = self.aggregate_non_missing_counts(non_missing_sample_counts, allele_counts)
+        # To share
+        # From nonmissing count : minor_allele_names_considered, major_allele_names_considered
+        #
+        if self.load('config')['algorithm'] in [ALGORITHM.CHI_SQUARE, ALGORITHM.LINEAR_REGRESSION]:
+            data_to_send.append(self.considered_snp_indices)
+        else:
+            beta_values, converged = self.aggregate_minor_allele()
+            data_to_send.append(beta_values)
+            data_to_send.append(converged)
+        # self.broadcast_data(data=[minor_allele_names_considered, major_allele_names_considered, data])
+        self.broadcast_data(data_to_send)
         share_attrs(self)
         if self.load('config')['algorithm'] == ALGORITHM.CHI_SQUARE:
             return 'Contingency_Table'
         if self.load('config')['algorithm'] == ALGORITHM.LINEAR_REGRESSION:
-            return ''
-        return ''
-
+            return 'Beta_Linear'
+        return 'Beta_Logistic'
 
     def aggregate_non_missing_counts(self, non_missing_sample_counts, allele_counts):
 
@@ -244,7 +294,8 @@ class AggregateNonMissingCounts(AppState, SplinkServer):
             self.major_allele_counts[snp_index] = major_allele_counts[snp_counter]
             self.minor_allele_frequencies[snp_index] = minor_allele_frequencies[snp_counter]
             self.major_allele_frequencies[snp_index] = major_allele_frequencies[snp_counter]
-        self.attrs_to_share += ['minor_allele_names', 'major_allele_names', 'minor_allele_counts', 'major_allele_counts',
+        self.attrs_to_share += ['minor_allele_names', 'major_allele_names', 'minor_allele_counts',
+                                'major_allele_counts',
                                 'minor_allele_frequencies', 'major_allele_frequencies']
         # share the global minor/major allele names
         minor_allele_names_considered = dict()
@@ -252,7 +303,7 @@ class AggregateNonMissingCounts(AppState, SplinkServer):
         for snp_index in self.considered_snp_indices:
             minor_allele_names_considered[snp_index] = self.minor_allele_names[snp_index]
             major_allele_names_considered[snp_index] = self.major_allele_names[snp_index]
-        return minor_allele_names_considered, major_allele_names_considered
+        return [minor_allele_names_considered, major_allele_names_considered]
 
     def aggregate_minor_allele(self):
         if self.load('config')['algorithm'] in [ALGORITHM.CHI_SQUARE, ALGORITHM.LINEAR_REGRESSION]:
@@ -264,10 +315,13 @@ class AggregateNonMissingCounts(AppState, SplinkServer):
             beta_values = dict()  # beta values shared with clients
             for snp_index in self.considered_in_process_snp_indices:
                 # 2 for snp and intercept columns
-                beta_values[snp_index] = np.array([0.0 for _ in range(0, len(self.covariates) + 2)])
+                beta_values[snp_index] = np.array([0.0 for _ in range(0, len(self.load('config')['covariates']) + 2)])
+                # beta_values[snp_index] = np.array([0.0 for _ in range(0, len(self.covariates) + 2)])
                 self.beta_values[snp_index] = beta_values[snp_index]
                 self.log_likelihood_values[snp_index] = None
 
             # share initial beta values (excluding ignored SNPs) for which gradient, Hessian, and log likelihood
             # should be computed in clients
-            return [beta_values, self.current_beta_iteration]
+            self.beta_values = beta_values
+            return beta_values, False
+            # return [beta_values, self.current_beta_iteration]

@@ -39,40 +39,35 @@ class Init(ConfigState.State, SplinkClient):
         self.lazy_init()
         self.read_config()
         self.finalize_config()
-        self.config['covariates'] = () if self.config['covariates'] is None else \
-            tuple(filter(None, self.config['covariates'].split(',')))
+        # self.config['covariates'] = () if self.config['covariate_names'] is None else \
+        #     tuple(filter(None, self.config['covariate_names'].split(',')))
+        self.config['covariates'] = tuple(filter(None, self.config['covariate_names'].split(',')))
         self.config['chunk_size'] = self.config['chunk_size'] * 1000
         self.store('config', self.config)
         self.store('smpc_used', self.config.get('use_smpc', False))
         self.read_dataset()
         non_zero_snp_ids = self.snp_id_step()
+        self.log(f"Initial SNP IDs: {non_zero_snp_ids}")
         self.send_data_to_coordinator(data=non_zero_snp_ids, use_smpc=False)
-
-        # self.store_attrs()
         share_attrs(self)
 
         if self.is_coordinator:
             return 'Aggregate_SNP'
         return 'Allele_Name'
-        # return 'Allele_Name'
-
 
     def read_dataset(self):
         gwas_dataset = GwasDataset(bed_file_path=self.load('input_files')['data'][0],
                                    phenotype_file_path=self.load('input_files')['phenotype'][0],
                                    covariate_file_path=self.load('input_files')['covariate'][0],
                                    phenotype_name=self.config['phenotype_name'],
-                                   covariate_names=self.config['covariate_names'])
+                                   covariate_names=self.config['covariates'])
 
         self.log("Opening and pre-processing the GWAS dataset ...")
         gwas_dataset.open_and_preprocess()
-        # if gwas_dataset.is_operation_failed():
-        #     self.log(gwas_dataset.get_error_message(), LogLevel.FATAL)
-        #     self.update(state=op_state.ERROR)
 
         # phenotypes should be binary for logistic regression and chi-square
         if not gwas_dataset.is_phenotype_binary() and \
-                (self.load('config')['algorithm'] in [ALGORITHM.CHI_SQUARE, ALGORITHM.LINEAR_REGRESSION]):
+                (self.load('config')['algorithm'] in [ALGORITHM.CHI_SQUARE, ALGORITHM.LOGISTIC_REGRESSION]):
             self.log(f"Phenotype values must be binary for {self.load('config')['algorithm']} tests!",
                      LogLevel.FATAL)
             self.update(state=op_state.ERROR)
@@ -112,10 +107,8 @@ class Init(ConfigState.State, SplinkClient):
         """ share SNP IDs with the server """
 
         # share the SNP IDs whose minor allele frequency is non-zero with the server
-        non_zero_snp_ids = np.array([snp_id for snp_id in self.snp_id_values if self.first_allele_names[snp_id] != '0'])
-        # non_zero_snp_ids = [snp_id for snp_id in self.snp_id_values if self.load('first_allele_names')[snp_id] != '0']
+        non_zero_snp_ids = set([snp_id for snp_id in self.snp_id_values if self.first_allele_names[snp_id] != '0'])
         return non_zero_snp_ids
-        # return non_zero_snp_ids.tolist()
 
 
 @app_state('Aggregate_SNP', Role.COORDINATOR)
@@ -127,9 +120,11 @@ class AggregateSNP(AppState, SplinkServer):
         self.register_transition('Allele_Name', Role.COORDINATOR)
 
     def run(self) -> str or None:
-        snp_ids_clients = self.await_data(unwrap=False)
+        snp_ids_clients = self.gather_data()
+        self.log("data is recieved")
         self.snp_id_step(snp_ids_clients)
         self.broadcast_data(self.snp_id_values)
+
         share_attrs(self)
         return 'Allele_Name'
 
@@ -138,10 +133,7 @@ class AggregateSNP(AppState, SplinkServer):
 
         # compute the SNP IDs common among all clients
         self.log("Inside SNP ID Agg")
-        intersect_snp_ids = set(snp_ids_clients[0])
-        for client_snp_ids in snp_ids_clients:
-            intersect_snp_ids = intersect_snp_ids.intersection(client_snp_ids)
-        self.snp_id_values = np.array(list(intersect_snp_ids), dtype="S")
+        self.snp_id_values = np.array(list(set.intersection(*snp_ids_clients)), dtype="S")
         if len(self.snp_id_values) == 0:
             self.log("There is no SNP common among all clients!", LogLevel.FATAL)
             self.update(state=op_state.ERROR)

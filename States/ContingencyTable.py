@@ -34,34 +34,40 @@ class ContingencyTable(AppState, SplinkClient):
 
     def run(self) -> str or None:
         load_attrs(self)
-        data = self.await_data()
-        global_minor_allele_names, global_major_allele_names, data = data
+        global_minor_allele_names, global_major_allele_names, self.snp_indices = self.await_data()
         self.minor_allele(global_minor_allele_names, global_major_allele_names)
-        if self.load('config')['algorithm'] in [ALGORITHM.CHI_SQUARE, ALGORITHM.LINEAR_REGRESSION]:
-            self.snp_indices = data
-            contingency_tables = self.contingency_table_step()
-            self.send_data_to_coordinator(data=contingency_tables, use_smpc=self.load('smpc_used'))
-        elif self.load('config')['algorithm'] == ALGORITHM.LOGISTIC_REGRESSION:
-            pass
+        contingency_tables = self.contingency_table_step()
+        self.send_data_to_coordinator(data=contingency_tables, use_smpc=self.load('smpc_used'))
+        # data = self.await_data()
+        # global_minor_allele_names, global_major_allele_names, data = data
+        # self.minor_allele(global_minor_allele_names, global_major_allele_names)
+        # self.attrs_to_share += ['snp_values', 'first_allele_names', 'second_allele_names']
+        # if self.load('config')['algorithm'] in [ALGORITHM.CHI_SQUARE, ALGORITHM.LINEAR_REGRESSION]:
+        #     self.snp_indices = data
+        #     contingency_tables = self.contingency_table_step()
+        #     self.send_data_to_coordinator(data=contingency_tables, use_smpc=self.load('smpc_used'))
+        # elif self.load('config')['algorithm'] == ALGORITHM.LOGISTIC_REGRESSION:
+        #     raise NotImplemented
+
         share_attrs(self)
         if self.is_coordinator:
             return 'Aggregate_Contingency_Table'
         return 'terminal'
 
-    def minor_allele(self, global_minor_allele_names, global_major_allele_names):
-
-        for snp_index in global_minor_allele_names.keys():
-            # if local minor/major allele is different from the global minor/major allele
-            if self.second_allele_names[snp_index] != global_major_allele_names[snp_index]:
-                # swap the local minor and major allele names
-                self.first_allele_names[snp_index] = global_minor_allele_names[snp_index]
-                self.second_allele_names[snp_index] = global_major_allele_names[snp_index]
-
-                # inverse the mapping of the SNP values 0 -> 2 and 2 -> 0
-                self.snp_values[snp_index] = np.where(self.snp_values[snp_index] == 2, -3, self.snp_values[snp_index])
-                self.snp_values[snp_index] = np.where(self.snp_values[snp_index] == 0, 2, self.snp_values[snp_index])
-                self.snp_values[snp_index] = np.where(self.snp_values[snp_index] == -3, 0, self.snp_values[snp_index])
-        self.attrs_to_share += ['snp_values', 'first_allele_names', 'second_allele_names']
+    # def minor_allele(self, global_minor_allele_names, global_major_allele_names):
+    #
+    #     for snp_index in global_minor_allele_names.keys():
+    #         # if local minor/major allele is different from the global minor/major allele
+    #         if self.second_allele_names[snp_index] != global_major_allele_names[snp_index]:
+    #             # swap the local minor and major allele names
+    #             self.first_allele_names[snp_index] = global_minor_allele_names[snp_index]
+    #             self.second_allele_names[snp_index] = global_major_allele_names[snp_index]
+    #
+    #             # inverse the mapping of the SNP values 0 -> 2 and 2 -> 0
+    #             self.snp_values[snp_index] = np.where(self.snp_values[snp_index] == 2, -3, self.snp_values[snp_index])
+    #             self.snp_values[snp_index] = np.where(self.snp_values[snp_index] == 0, 2, self.snp_values[snp_index])
+    #             self.snp_values[snp_index] = np.where(self.snp_values[snp_index] == -3, 0, self.snp_values[snp_index])
+    #     self.attrs_to_share += ['snp_values', 'first_allele_names', 'second_allele_names']
 
     # ##### contingency table step related functions
     def contingency_table_step(self):
@@ -169,6 +175,10 @@ class ContingencyTable(AppState, SplinkClient):
             return int(2 * np.where(trait_snp_values == SnpValue.HOMOZYGOTE_11)[0].size +
                        np.where(trait_snp_values == SnpValue.HETEROZYGOTE)[0].size)
 
+    def minor_allele(self, global_minor_allele_names, global_major_allele_names):
+        super().minor_allele(global_minor_allele_names, global_major_allele_names)
+        self.attrs_to_share += ['snp_values', 'first_allele_names', 'second_allele_names']
+
 
 @app_state('Aggregate_Contingency_Table', Role.COORDINATOR)
 class AggregateContingencyTable(AppState, SplinkServer):
@@ -218,6 +228,8 @@ class AggregateContingencyTable(AppState, SplinkServer):
         save_process.start()
         save_process.join()
         save_process.terminate()
+        # empty the dictionaries to release the memory because they are not needed anymore
+        self.init_algorithm_attributes()
 
     def compute_results_chi_square(self):
         """ Compute MAF for case/control, chi-square, odd-ratio, and p-values for chi-square algorithm """

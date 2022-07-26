@@ -31,22 +31,29 @@ class AlleleName(AppState, SplinkClient):
         self.register_transition('Non_Missing_counts', Role.PARTICIPANT)
 
     def run(self) -> str or None:
+        """
+        Sharing:
+        allele_names
+        sample_count
+        Returns
+        -------
+
+        """
         snp_id_values = self.await_data()
         load_attrs(self)
         self.log(f"{len(snp_id_values)} SNPs are common among all clients")
         allele_names = self.allele_name_step(snp_id_values)
         self.send_data_to_coordinator(data=allele_names, use_smpc=False)
         share_attrs(self)
-        if self.coordinator:
+        if self.is_coordinator:
             self.store('allele_names_clients', self.gather_data())
         else:
             sleep(5)
-        self.send_data_to_coordinator(data=self.load('sample_count'), use_smpc=self.load('smpc_used'))
-
-        if self.coordinator:
+        # self.send_data_to_coordinator(data=self.load('sample_count'), use_smpc=self.load('smpc_used'))
+        self.send_data_to_coordinator(data=self.sample_count, use_smpc=self.load('smpc_used'))
+        if self.is_coordinator:
             return 'Aggregate_Allele_Name'
         return 'Non_Missing_counts'
-
 
     def allele_name_step(self, snp_id_values):
         """ Initialize SNP (ID) values and first/second allele names based on global (common) SNP IDs first,
@@ -57,8 +64,10 @@ class AlleleName(AppState, SplinkClient):
 
         # update SNP values
         snp_values = list()
+        # self.log(set(self.snp_values.keys()))
         for snp_id in snp_id_values:
-            snp_values.append(self.load('snp_values')[snp_id])
+            # snp_values.append(self.load('snp_values')[snp_id])
+            snp_values.append(self.snp_values[snp_id])
         self.snp_values = snp_values
 
         # update first/second allele names and initialize allele names (shared with server)
@@ -95,16 +104,25 @@ class AggregateAlleleName(AppState, SplinkServer):
         self.register_transition('Non_Missing_counts', Role.COORDINATOR)
 
     def run(self) -> str or None:
+        """
+        Aggregating:
+        allele_counts
+        sample_count
+        Returns
+        -------
+
+        """
         load_attrs(self)
         self.aggregate_alleles(self.load('allele_names_clients'))
         sample_count = self.aggregate_data(operation=SMPCOperation.ADD, use_smpc=self.load('smpc_used'))
 
-        self.setup_next_chunk()
-        self.broadcast_data(data=[self.current_chunk,
-                                  self.load('total_chunks'),
-                                  self.considered_snp_indices,
-                                  self.chunk_start_index,
-                                  self.chunk_end_index])
+        data_to_send = self.setup_next_chunk()
+        self.broadcast_data(data_to_send)
+        # self.broadcast_data(data=[self.current_chunk,
+        #                           self.load('total_chunks'),
+        #                           self.considered_snp_indices,
+        #                           self.chunk_start_index,
+        #                           self.chunk_end_index])
         share_attrs(self)
         return 'Non_Missing_counts'
 

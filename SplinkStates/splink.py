@@ -57,6 +57,8 @@ class Splink:
         self._in_process_snp_indices = set()
         self._considered_in_process_snp_indices = set()
         self.attrs_to_share = []
+        self.delta_log_likelihood_threshold = 0.0001
+
 
     @property
     def allele_names(self):

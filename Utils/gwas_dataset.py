@@ -292,33 +292,21 @@ class GwasDataset:
 
         if self.phenotype_file_path:
             self.open_phenotype_dataframe()
-            # if self.is_operation_failed():
-            #     return
 
         if self.covariate_file_path:
             self.open_covariate_dataframe()
-            # if self.is_operation_failed():
-            #     return
 
         # sanity checks for phenotype values
         self.binary_phenotype_sanity_check()
-        # if self.is_operation_failed():
-        #     return
 
         # map 1/2 encoded binary phenotypes to 0/1
         self.binary_phenotype_map_to_0_1()
-        # if self.is_operation_failed():
-        #     return
 
         # init non_missing indices
         self.init_non_missing_index_values()
-        # if self.is_operation_failed():
-        #     return
 
         # init covariate matrix
         self.init_covariate_matrix()
-        # if self.is_operation_failed():
-        #     return
 
         # open and load snp values
         self.open_bed_file()
