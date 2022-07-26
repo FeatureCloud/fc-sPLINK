@@ -1,0 +1,21 @@
+splink:
+  local_dataset:
+    data: hapmap1_100.bed
+    phenotype: hapmap1_100_quant.pheno
+    covariate: hapmap1_100.cov
+  phenotype_name: pheno
+  covariate_names: Age,Smoking
+  logic:
+    mode: file
+    dir: .
+  axis: 0
+  use_smpc: false
+  algorithm: linear-regression
+  covariates: null
+  chunk_size: 10
+  max_iterations: 20
+  cpu_cores: 1
+  result:
+    manhattan: manhattan-plot
+    output: linear-regression-result.csv
+

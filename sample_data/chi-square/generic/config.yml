@@ -1,0 +1,21 @@
+splink:
+  local_dataset:
+    data: hapmap1_100.bed
+    phenotype: hapmap1_100.pheno
+    covariate: hapmap1_100.cov
+  phenotype_name: pheno
+  covariate_names: Age,Smoking
+  logic:
+    mode: file
+    dir: .
+  axis: 0
+  use_smpc: false
+  algorithm: chi-square
+  covariates: null
+  chunk_size: 10
+  max_iterations: 20
+  cpu_cores: 4
+  result:
+    manhattan: manhattan-plot
+    output: chi-quare-result.csv # logistic-regression-result.csv or linear-regression-result.csv or chi-square-result.csv
+
