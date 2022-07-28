@@ -1,8 +1,7 @@
-# FeatureCloud sPLINK
+# [FeatureCloud sPLINK](https://featurecloud.ai/app/splink)
 ## sPLINK workflow in FeatureCloud platform: Privacy-aware Tool for Genome-wide Association Studies__
 
-**sPLINK** is a tool set for federated, privacy-aware genome-wide association studies (GWAS). **sPLINK** is based on the [HyFed framework](https://github.com/tum-aimed/hyfed), 
-and supports three association tests: chi-square, linear regression, and logistic regression. The sPLINK paper was published at Genome Biology: https://doi.org/10.1186/s13059-021-02562-1.
+**sPLINK** is a tool for federated, privacy-aware genome-wide association studies (GWAS). **sPLINK** is based on the [HyFed framework](https://github.com/tum-aimed/hyfed) and supports three association tests: chi-square, linear regression, and logistic regression. The sPLINK paper was published in Genome Biology: https://doi.org/10.1186/s13059-021-02562-1.
 
    
 
@@ -36,7 +35,7 @@ splink:
 
 ## Experiments
 Different experiments can be done using FC sPLINK app based on the association tests. For each test, one should use
-different parameters in the config file. All the experiments are covered in the sample data directory.
+other parameters in the config file. All the experiments are covered in the sample data directory.
 
 ### Chi-Square
 
@@ -120,13 +119,13 @@ splink:
 
 #### Prerequisite
 
-To run the flimma application you should install Docker and featurecloud pip package:
+To run the sPLINK application you should install Docker and featurecloud pip package:
 
 ```shell
 pip install featurecloud
 ```
 
-Then either download the flimma image from featurecloud docker repository:
+Then either download the sPLINK image from featurecloud docker repository:
 
 ```shell
 featurecloud app download featurecloud.ai/splink
@@ -138,7 +137,7 @@ Or build the app locally:
 featurecloud app build featurecloud.ai/splink
 ```
 
-You can use provided example data or you own data. And provide the desired settings in the `config.yml` file.
+You can use provided example data or your own data. And provide the desired settings in the `config.yml` file.
 
 #### Running app
 
