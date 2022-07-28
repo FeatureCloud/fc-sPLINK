@@ -191,7 +191,6 @@ class SplinkServer(Splink):
         self.compute_t_stat_values()
         self.compute_p_values(algorithm, covariates)
 
-
     # # ############## Chunking functions
     # def init_chunks(self):
     #     """ Set the total number of chunks and start/end indices of the chunks """
@@ -334,22 +333,25 @@ class SplinkServer(Splink):
         colors = ['blue', 'green', 'purple', 'brown']
         x_labels = []
         x_labels_pos = []
-        for num, (name, group) in enumerate(manhattan_df_grouped):
-            group.plot(kind='scatter', x='ind', y='P_LOG10', color=colors[num % len(colors)], ax=ax)
+        try:
+            for num, (name, group) in enumerate(manhattan_df_grouped):
+                group.plot(kind='scatter', x='ind', y='P_LOG10', color=colors[num % len(colors)], ax=ax)
 
-            x_labels.append(name)
-            x_labels_pos.append((group['ind'].iloc[-1] - (group['ind'].iloc[-1] - group['ind'].iloc[0]) / 2))
+                x_labels.append(name)
+                x_labels_pos.append((group['ind'].iloc[-1] - (group['ind'].iloc[-1] - group['ind'].iloc[0]) / 2))
 
-            print(x_labels_pos[-1])
-        ax.set_xticks(x_labels_pos)
-        ax.set_xticklabels(x_labels)
-        ax.set_xlim([0, len(manhattan_df)])
-        ax.set_xlabel('Chromosome')
-        ax.set_ylabel('-log10(p)')
+                print(x_labels_pos[-1])
+            ax.set_xticks(x_labels_pos)
+            ax.set_xticklabels(x_labels)
+            ax.set_xlim([0, len(manhattan_df)])
+            ax.set_xlabel('Chromosome')
+            ax.set_ylabel('-log10(p)')
 
-        plt.savefig(manhatan_filename, format='png')
+            plt.savefig(manhatan_filename, format='png')
 
-        log(f'Manhattan plot created!')
+            log(f'Manhattan plot created!')
+        except Exception as m_exp:
+            log("Manhattan plot is not supported for this scenario")
 
     # used in std-error step of linear/logistic regression
     def read_queue_std_error(self, queue_std_error):
@@ -393,7 +395,7 @@ class SplinkServer(Splink):
             result_file.write("\n" + str(csv_row))
 
             for covariate in covariates:
-            # for beta_counter, covariate in enumerate(covariates):
+                # for beta_counter, covariate in enumerate(covariates):
                 beta_counter += 1
                 beta_value = round_result(self.beta_values[snp_index][beta_counter])
                 t_stat_value = round_result(self.t_stat_values[snp_index][beta_counter])

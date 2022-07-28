@@ -205,8 +205,6 @@ class AggregateSTDErrorLinear(AppState, SplinkServer):
 
         # add chromosome number, base pair distance, and p-value of the current chunk to results for all chunks
         self.append_to_results_all_chunks()
-        self.log(self.p_values[0])
-        self.log(self.p_value_all_chunks[0])
 
         # save results
         save_process = multiprocessing.Process(target=self.save_results_regression,

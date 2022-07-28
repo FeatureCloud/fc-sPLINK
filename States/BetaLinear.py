@@ -66,8 +66,6 @@ class BetaLinear(AppState, SplinkClient):
         xt_x_matrix_read_thread.daemon = True
         xt_x_matrix_read_thread.start()
 
-        self.log(self.xt_x_matrix)
-
         xt_y_vector_read_thread = threading.Thread(target=self.read_queue_xt_y_vector,
                                                    args=(queue_xt_y_vector,))
         xt_y_vector_read_thread.daemon = True
@@ -98,8 +96,6 @@ class BetaLinear(AppState, SplinkClient):
         # convert dictionaries to lists;
         xt_x_matrix = list()
         xt_y_vector = list()
-        self.log(self.snp_indices)
-        self.log(self.xt_x_matrix.keys())
         for snp_index in sorted(self.snp_indices):
             xt_x_matrix.append(self.xt_x_matrix[snp_index])
             xt_y_vector.append(self.xt_y_vector[snp_index])
@@ -174,7 +170,8 @@ class AggregateBetaLinear(AppState, SplinkServer):
         # self.broadcast_data(beta_values)
         self.beta_linear_step(xt_x_matrices, xt_y_vectors)
         self.broadcast_data(self.beta_values)
-        self.attrs_to_share += ['considered_snp_indices', 'xt_x_matrices', 'xt_y_vectors', 'std_error_values','t_stat_values', 'p_values']
+        self.attrs_to_share += ['considered_snp_indices', 'xt_x_matrices', 'xt_y_vectors', 'std_error_values',
+                                't_stat_values', 'p_values']
         share_attrs(self)
         return 'STD_Error_Linear'
 
